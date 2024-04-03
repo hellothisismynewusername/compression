@@ -59,6 +59,10 @@ fn main() {
                 new_buf.insert(0, j);
             }
         }
+        let num = (affected_indexes.len() as u32).to_ne_bytes();
+        for thing in num {
+            new_buf.insert(0, thing);
+        }
         writefile.write_all(&new_buf);
     } else {
         let mut new_file_name = String::new();
@@ -69,6 +73,7 @@ fn main() {
         let mut file_buf : Vec<u8> = Vec::new();
         let file_length = readfile.read_to_end(&mut file_buf).expect("Reading into buffer in decompression mode didn't work");
         print_u8_vec(&file_buf);
+
     }
 
 }
