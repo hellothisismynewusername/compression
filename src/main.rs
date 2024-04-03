@@ -36,8 +36,13 @@ fn main() {
         let mut new_buf : Vec<u8> = file_buf.clone();
         let mut affected_indexes : Vec<u32> = Vec::new();
         for i in 0..new_buf.len() {
-            if i < new_buf.len() - 1 {
-                if new_buf[i + 1] == new_buf[i] {
+            if new_buf.len() > 7 && i < new_buf.len() - 7 {
+                if new_buf[i + 1] == new_buf[i] &&
+                new_buf[i + 2] == new_buf[i] &&
+                new_buf[i + 3] == new_buf[i] && 
+                new_buf[i + 4] == new_buf[i] && 
+                new_buf[i + 5] == new_buf[i] && 
+                new_buf[i + 6] == new_buf[i] {
                     let mut cntr : u8 = 1;
                     while i + 1 < new_buf.len() && cntr < 255 && new_buf[i + 1] == new_buf[i] {
                         new_buf.remove(i + 1);
