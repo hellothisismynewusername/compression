@@ -100,8 +100,18 @@ fn main() {
             println!("{}", positions[i as usize]);
         }
         let mut ptr : usize= 4 + (4 * (counter as usize));
-        let mut mangled : Vec<u8> = file_buf[ptr..file_buf.len()].to_vec();
-        print_u8_vec(&mangled);
+        let mut out : Vec<u8> = file_buf[ptr..file_buf.len()].to_vec();
+        print_u8_vec(&out);
+        for pos in positions {
+            let times : u8 = out[pos as usize] - 2;
+            let byte : u8 = out[pos as usize + 1];
+            out[pos as usize] = byte;
+            for i in 0..times {
+                out.insert(pos as usize, byte);
+            }
+        }
+        print_u8_vec(&out);
+        writefile.write_all(&out);
     }
 
 }
