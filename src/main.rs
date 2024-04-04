@@ -54,12 +54,12 @@ fn main() {
             }
         }
         for i in 0..affected_indexes.len() {
-            let bruh = affected_indexes[i].to_ne_bytes();
+            let bruh = affected_indexes[i].to_le_bytes();
             for j in bruh {
                 new_buf.insert(0, j);
             }
         }
-        let num = (affected_indexes.len() as u32).to_ne_bytes();
+        let num = (affected_indexes.len() as u32).to_le_bytes();
         for thing in num {
             new_buf.insert(0, thing);
         }
@@ -73,7 +73,35 @@ fn main() {
         let mut file_buf : Vec<u8> = Vec::new();
         let file_length = readfile.read_to_end(&mut file_buf).expect("Reading into buffer in decompression mode didn't work");
         print_u8_vec(&file_buf);
-
+        let mut counter_buf : [u8; 4] = [0; 4];
+        for i in 0..4 {
+            counter_buf[i] = file_buf[i];
+        }
+        let counter : u32 = u32::from_be_bytes(counter_buf);
+        println!("{}", counter);
+        let mut offset : usize = 4;
+        let mut positions_buf : Vec<u8> = Vec::new();
+        for i in 0..counter {
+            for j in 0..4 {
+                positions_buf.push(file_buf[offset + j]);
+            }
+            offset += 4;
+        }
+        print_u8_vec(&positions_buf);
+        let mut positions : Vec<u32> = Vec::new();
+        offset = 0;
+        for i in 0..counter {
+            let mut items : [u8; 4] = [0; 4];
+            for j in 0..4 {
+                items[j] = positions_buf[offset + j];
+            }
+            offset += 4;
+            positions.push(u32::from_be_bytes(items));
+            println!("{}", positions[i as usize]);
+        }
+        let mut ptr : usize= 4 + (4 * (counter as usize));
+        let mut mangled : Vec<u8> = file_buf[ptr..file_buf.len()].to_vec();
+        print_u8_vec(&mangled);
     }
 
 }
