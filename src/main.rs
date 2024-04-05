@@ -7,7 +7,7 @@ fn main() {
     let mut compression : bool = true;
     let mut cntr = 0;
     for arg in std::env::args() {
-        println!("{}", arg);
+        //println!("{}", arg);
         if cntr == 1 {
             file_name = Some(arg.clone());
         }
@@ -31,7 +31,7 @@ fn main() {
         let mut writefile = File::create(file_name.unwrap() + ".crispyfries").expect("Making writefile failed");
         let mut file_buf : Vec<u8> = Vec::new();
         let file_length = readfile.read_to_end(&mut file_buf).expect("Reading into buffer in compression mode didn't work");
-        print_u8_vec(&file_buf);
+        //print_u8_vec(&file_buf);
         let mut cntr : u64 = 0;
         let mut new_buf : Vec<u8> = file_buf.clone();
         let mut affected_indexes : Vec<u32> = Vec::new();
@@ -72,13 +72,13 @@ fn main() {
         let mut writefile = File::create(new_file_name + ".uncrispied").expect("Making writefile failed");
         let mut file_buf : Vec<u8> = Vec::new();
         let file_length = readfile.read_to_end(&mut file_buf).expect("Reading into buffer in decompression mode didn't work");
-        print_u8_vec(&file_buf);
+        //print_u8_vec(&file_buf);
         let mut counter_buf : [u8; 4] = [0; 4];
         for i in 0..4 {
             counter_buf[i] = file_buf[i];
         }
         let counter : u32 = u32::from_be_bytes(counter_buf);
-        println!("{}", counter);
+        //println!("{}", counter);
         let mut offset : usize = 4;
         let mut positions_buf : Vec<u8> = Vec::new();
         for i in 0..counter {
@@ -87,7 +87,7 @@ fn main() {
             }
             offset += 4;
         }
-        print_u8_vec(&positions_buf);
+        //print_u8_vec(&positions_buf);
         let mut positions : Vec<u32> = Vec::new();
         offset = 0;
         for i in 0..counter {
@@ -97,11 +97,11 @@ fn main() {
             }
             offset += 4;
             positions.push(u32::from_be_bytes(items));
-            println!("{}", positions[i as usize]);
+            //println!("{}", positions[i as usize]);
         }
         let mut ptr : usize= 4 + (4 * (counter as usize));
         let mut out : Vec<u8> = file_buf[ptr..file_buf.len()].to_vec();
-        print_u8_vec(&out);
+        //print_u8_vec(&out);
         for pos in positions {
             let times : u8 = out[pos as usize] - 2;
             let byte : u8 = out[pos as usize + 1];
@@ -110,7 +110,7 @@ fn main() {
                 out.insert(pos as usize, byte);
             }
         }
-        print_u8_vec(&out);
+        //print_u8_vec(&out);
         writefile.write_all(&out);
     }
 
