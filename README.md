@@ -1,4 +1,4 @@
-It's a lossless file compressor that kinda sucks and is slow and a memory hog. At best I made something 3% smaller (that wasn't just a test file full of the same stuff), but it really depends on the file because it just uses run length encoding.
+It's a lossless file compressor that kinda sucks and is slow and a memory hog. It just uses run length encoding in a really inefficient way.
 
 `cargo build` to build and then either `compression.exe` or `./compression` to run.
 Example: 
