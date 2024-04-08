@@ -5,18 +5,23 @@ use std::fs::File;
 fn main() {
     let mut file_name : Option<String> = None;
     let mut compression : bool = true;
-    let mut cntr = 0;
+    let mut verbose : bool = false;
+    let mut arg_cntr = 0;
     for arg in std::env::args() {
-        //println!("{}", arg);
-        if cntr == 1 {
+        if arg_cntr == 1 {
             file_name = Some(arg.clone());
         }
-        if cntr == 2 && arg == "-d" {
-            compression = false;
+        if arg_cntr == 2 || arg_cntr == 3 {
+            if arg == "-d" {
+                compression = false;
+            }
+            if arg == "-v" {
+                verbose = true;
+            }
         }
-        cntr += 1;
+        arg_cntr += 1;
     }
-    if cntr > 3 || cntr < 2 {
+    if arg_cntr > 3 || arg_cntr < 2 {
         println!("Wrong number of arguments");
     }
     let mut readfile;
@@ -28,94 +33,105 @@ fn main() {
     }
 
     if compression {
+        if verbose { println!("Reading file"); }
         let mut writefile = File::create(file_name.unwrap() + ".crispyfries").expect("Making writefile failed");
         let mut file_buf : Vec<u8> = Vec::new();
-        let file_length = readfile.read_to_end(&mut file_buf).expect("Reading into buffer in compression mode didn't work");
-        //print_u8_vec(&file_buf);
-        let mut cntr : u64 = 0;
-        let mut new_buf : Vec<u8> = file_buf.clone();
+        readfile.read_to_end(&mut file_buf).expect("Reading into buffer in compression mode didn't work");
+        if verbose { println!("Part 1"); }
         let mut affected_indexes : Vec<u32> = Vec::new();
-        for i in 0..new_buf.len() {
-            if new_buf.len() > 7 && i < new_buf.len() - 7 {
-                if new_buf[i + 1] == new_buf[i] &&
-                new_buf[i + 2] == new_buf[i] &&
-                new_buf[i + 3] == new_buf[i] && 
-                new_buf[i + 4] == new_buf[i] && 
-                new_buf[i + 5] == new_buf[i] && 
-                new_buf[i + 6] == new_buf[i] {
-                    let mut cntr : u8 = 1;
-                    while i + 1 < new_buf.len() && cntr < 255 && new_buf[i + 1] == new_buf[i] {
-                        new_buf.remove(i + 1);
-                        cntr += 1;
+        {
+        let mut i = 0;
+            while i < file_buf.len() {
+                if file_buf.len() > 7 && i < file_buf.len() - 7 {
+                    if file_buf[i + 1] == file_buf[i] &&
+                    file_buf[i + 2] == file_buf[i] &&
+                    file_buf[i + 3] == file_buf[i] && 
+                    file_buf[i + 4] == file_buf[i] && 
+                    file_buf[i + 5] == file_buf[i] && 
+                    file_buf[i + 6] == file_buf[i] {
+                        let mut cntr : u8 = 1;
+                        while i + 1 < file_buf.len() && cntr < 255 && file_buf[i + 1] == file_buf[i] {
+                            file_buf.remove(i + 1);
+                            cntr += 1;
+                        }
+                        affected_indexes.push(i as u32);
+                        file_buf.insert(i, cntr);
                     }
-                    affected_indexes.push(i as u32);
-                    new_buf.insert(i, cntr);
                 }
+                if verbose && i % 1000 == 0 {
+                    println!("{}%", (((i as f64 / file_buf.len() as f64) * 100000.) as u64) as f64 / 1000.);
+                } 
+                i += 1;
             }
         }
+        if verbose { println!("Part 2"); }
+        
         for i in 0..affected_indexes.len() {
             let bruh = affected_indexes[i].to_le_bytes();
             for j in bruh {
-                new_buf.insert(0, j);
+                file_buf.insert(0, j);
             }
         }
         let num = (affected_indexes.len() as u32).to_le_bytes();
         for thing in num {
-            new_buf.insert(0, thing);
+            file_buf.insert(0, thing);
         }
-        writefile.write_all(&new_buf);
+        if verbose { println!("Writing file"); }
+
+        writefile.write_all(&file_buf).expect("Couldn't write the file properly");
     } else {
         let mut new_file_name = String::new();
-        for i in 0..(file_name.clone().unwrap().len() - 12) {
-            new_file_name.push(file_name.clone().unwrap().chars().nth(i).unwrap());
+        if (file_name.clone().unwrap().len() as i32) - 12 < 0 {
+            new_file_name = String::from("out");
+        } else {
+            for i in 0..(file_name.clone().unwrap().len() - 12) {
+                new_file_name.push(file_name.clone().unwrap().chars().nth(i).unwrap());
+            }
         }
         let mut writefile = File::create(new_file_name + ".uncrispied").expect("Making writefile failed");
         let mut file_buf : Vec<u8> = Vec::new();
-        let file_length = readfile.read_to_end(&mut file_buf).expect("Reading into buffer in decompression mode didn't work");
-        //print_u8_vec(&file_buf);
+        readfile.read_to_end(&mut file_buf).expect("Reading into buffer in decompression mode didn't work");
+
         let mut counter_buf : [u8; 4] = [0; 4];
         for i in 0..4 {
             counter_buf[i] = file_buf[i];
         }
         let counter : u32 = u32::from_be_bytes(counter_buf);
-        //println!("{}", counter);
         let mut offset : usize = 4;
         let mut positions_buf : Vec<u8> = Vec::new();
-        for i in 0..counter {
+        for _i in 0..counter {
             for j in 0..4 {
                 positions_buf.push(file_buf[offset + j]);
             }
             offset += 4;
         }
-        //print_u8_vec(&positions_buf);
         let mut positions : Vec<u32> = Vec::new();
         offset = 0;
-        for i in 0..counter {
+        for _i in 0..counter {
             let mut items : [u8; 4] = [0; 4];
             for j in 0..4 {
                 items[j] = positions_buf[offset + j];
             }
             offset += 4;
             positions.push(u32::from_be_bytes(items));
-            //println!("{}", positions[i as usize]);
         }
-        let mut ptr : usize= 4 + (4 * (counter as usize));
+        let ptr : usize= 4 + (4 * (counter as usize));
         let mut out : Vec<u8> = file_buf[ptr..file_buf.len()].to_vec();
-        //print_u8_vec(&out);
         for pos in positions {
             let times : u8 = out[pos as usize] - 2;
             let byte : u8 = out[pos as usize + 1];
             out[pos as usize] = byte;
-            for i in 0..times {
+            for _i in 0..times {
                 out.insert(pos as usize, byte);
             }
         }
-        //print_u8_vec(&out);
-        writefile.write_all(&out);
+
+        writefile.write_all(&out).expect("Couldn't write the file properly");
     }
 
 }
 
+/*
 fn print_u8_vec(inp : &Vec<u8>) {
     println!();
     print!("{{");
@@ -124,3 +140,4 @@ fn print_u8_vec(inp : &Vec<u8>) {
     }
     print!("}}");
 }
+*/
