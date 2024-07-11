@@ -130,14 +130,3 @@ fn main() {
     }
 
 }
-
-/*
-fn print_u8_vec(inp : &Vec<u8>) {
-    println!();
-    print!("{{");
-    for i in inp {
-        print!("{}, ", i);
-    }
-    print!("}}");
-}
-*/
