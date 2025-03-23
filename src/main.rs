@@ -2,6 +2,8 @@ use std::io::{Read, Write};
 use std::process::exit;
 use std::fs::File;
 
+mod the_thing;
+
 fn main() {
     let mut file_name : Option<String> = None;
     let mut compression : bool = true;
