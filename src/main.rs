@@ -5,33 +5,28 @@ use std::fs::File;
 mod the_thing;
 
 fn main() {
-    let mut file_name : Option<String> = None;
+    let mut file_names : Vec<String> = Vec::new();
     let mut compression : bool = true;
-    let mut verbose : bool = false;
-    let mut arg_cntr = 0;
+    let mut print : bool = false;
+    let mut arg_cntr : u64 = 0;
     for arg in std::env::args() {
-        if arg_cntr == 1 {
-            file_name = Some(arg.clone());
-        }
-        if arg_cntr == 2 || arg_cntr == 3 {
-            if arg == "-d" {
+        if arg_cntr >= 1 {
+            if &arg == "-d" {
                 compression = false;
-            }
-            if arg == "-v" {
-                verbose = true;
+            } else {
+                file_names.push(arg.clone());
             }
         }
         arg_cntr += 1;
     }
-    if arg_cntr > 3 || arg_cntr < 2 {
-        println!("Wrong number of arguments");
-    }
-    let mut readfile;
-    if file_name.is_none() {
-        println!("It didn't work");
+    let mut readfiles = Vec::new();
+    if file_names.is_empty() {
+        println!("No input file(s) provided");
         exit(1);
-    } else {
-        readfile = File::open(file_name.clone().unwrap()).expect("Couldn't open up '{file_name}'");
+    }
+    if !compression && file_names.len() != 1 {
+        println!("Provide only 1 file for decompression");
+        exit(1);
     }
 
     if compression {
