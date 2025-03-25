@@ -3,21 +3,23 @@ use std::process::exit;
 use std::fs::File;
 
 mod the_thing;
+use the_thing::Bad;
+
 
 fn main() {
     let mut file_names : Vec<String> = Vec::new();
     let mut compression : bool = true;
     let mut print : bool = false;
-    for (i, arg) in std::env::args().iter().enumerate() {
+    for (i, arg) in std::env::args().enumerate() {
         if i >= 1 {
-            match &arg {
+            match &*arg {
                 "-d" => compression = false,
                 "-v" => print = true,
                 _ => file_names.push(arg.clone())
             }
         }
     }
-    let mut readfiles = Vec::new();
+    
     if file_names.is_empty() {
         println!("No input file(s) provided");
         exit(1);
@@ -32,19 +34,37 @@ fn main() {
         let tmp = File::open(name);
         if tmp.is_err() {
             println!("Error opening '{}'", name);
+            exit(1);
         }
-
-        Ok(tmp)
+        tmp.ok().unwrap()
     }).collect();
 
     if compression {
 
         let bytes : Vec<u8> = match the_thing::ball(file_vec) {
             Ok(x) => x,
-            Err(Bad::Nothing) => println!("unreachable"); vec![0],
-            Err(Bad::TooLarge) => println!("Files provided are too great in size"); vec![0],
-            Err(e) => println!("{}", e); exit(1); vec![0]
-        }
+            Err(Bad::Nothing) => {
+                println!("unreachable");
+                exit(1);
+            },
+            Err(Bad::TooLarge) => {
+                println!("Files provided are too great in size");
+                exit(1);
+            },
+            Err(Bad::IOError(e)) => {
+                println!("{}", e);
+                exit(1);
+            },
+            Err(Bad::Error(e)) => {
+                println!("{}", e);
+                exit(1);
+            },
+
+            _ => {
+                println!("Something went wrong");
+                exit(1);
+            }
+        };
     } else {
 
     }

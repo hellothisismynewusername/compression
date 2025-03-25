@@ -1,11 +1,12 @@
 use core::num;
-use std::io::{ErrorKind, Read, Write};
-use std::fs::File;
+use std::io::{Error, ErrorKind, Read, Write};
+use std::fs::{File, OpenOptions};
 use std::usize;
 
 pub enum Bad {
     Nothing,
     TooLarge,
+    IOError(Error),
     Error(ErrorKind)
 }
 
@@ -173,49 +174,56 @@ pub fn decompress(file_name : &str) -> Result<Vec<u8>, Bad> {
     //     }
     // }
 
-    let mut readfile = File::open(file_name)?;
-    let mut file_buf : Vec<u8> = Vec::new();
-    readfile.read_to_end(&mut file_buf).expect("Reading into buffer in decompression mode didn't work");
-
-    if readfile.bytes().count() > u32::MAX as usize {
-        Err(Bad::TooLarge)
-    } else if readfile.bytes().count() == 0 {
-        Err(Bad::Nothing)
+    let readfile_res = File::open(file_name);
+    if readfile_res.is_err() {
+        Err(Bad::IOError(readfile_res.err().unwrap()))
     } else {
-        let mut counter_buf : [u8; 4] = [0; 4];
-        for i in 0..4 {
-            counter_buf[i] = file_buf[i];
-        }
-        let counter : u32 = u32::from_be_bytes(counter_buf);
-        let mut offset : usize = 4;
-        let mut positions_buf : Vec<u8> = Vec::new();
-        for _i in 0..counter {
-            for j in 0..4 {
-                positions_buf.push(file_buf[offset + j]);
-            }
-            offset += 4;
-        }
-        let mut positions : Vec<u32> = Vec::new();
-        offset = 0;
-        for _i in 0..counter {
-            let mut items : [u8; 4] = [0; 4];
-            for j in 0..4 {
-                items[j] = positions_buf[offset + j];
-            }
-            offset += 4;
-            positions.push(u32::from_be_bytes(items));
-        }
-        let ptr : usize= 4 + (4 * (counter as usize));
-        let mut out : Vec<u8> = file_buf[ptr..file_buf.len()].to_vec();
-        for pos in positions {
-            let times : u8 = out[pos as usize] - 2;
-            let byte : u8 = out[pos as usize + 1];
-            out[pos as usize] = byte;
-            for _i in 0..times {
-                out.insert(pos as usize, byte);
-            }
-        }
 
-        Ok(out)
+        let mut readfile = readfile_res.ok().unwrap();
+
+        let mut file_buf : Vec<u8> = Vec::new();
+        readfile.read_to_end(&mut file_buf).expect("Reading into buffer in decompression mode didn't work");
+
+        if (&readfile).bytes().count() > u32::MAX as usize {
+            Err(Bad::TooLarge)
+        } else if readfile.bytes().count() == 0 {
+            Err(Bad::Nothing)
+        } else {
+            let mut counter_buf : [u8; 4] = [0; 4];
+            for i in 0..4 {
+                counter_buf[i] = file_buf[i];
+            }
+            let counter : u32 = u32::from_be_bytes(counter_buf);
+            let mut offset : usize = 4;
+            let mut positions_buf : Vec<u8> = Vec::new();
+            for _i in 0..counter {
+                for j in 0..4 {
+                    positions_buf.push(file_buf[offset + j]);
+                }
+                offset += 4;
+            }
+            let mut positions : Vec<u32> = Vec::new();
+            offset = 0;
+            for _i in 0..counter {
+                let mut items : [u8; 4] = [0; 4];
+                for j in 0..4 {
+                    items[j] = positions_buf[offset + j];
+                }
+                offset += 4;
+                positions.push(u32::from_be_bytes(items));
+            }
+            let ptr : usize= 4 + (4 * (counter as usize));
+            let mut out : Vec<u8> = file_buf[ptr..file_buf.len()].to_vec();
+            for pos in positions {
+                let times : u8 = out[pos as usize] - 2;
+                let byte : u8 = out[pos as usize + 1];
+                out[pos as usize] = byte;
+                for _i in 0..times {
+                    out.insert(pos as usize, byte);
+                }
+            }
+
+            Ok(out)
+        }
     }
 }
