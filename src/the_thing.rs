@@ -11,9 +11,10 @@ pub enum Bad {
 }
 
 pub fn ball(mut files : Vec<File>) -> Result<Vec<u8>, Bad> {
-    let files_num = files.iter().count();
+    let files_num = files.len();
     let byte_amount = files.iter().fold(0, |accum : u64, x| {
-        accum + x.bytes().count() as u64
+        println!("WERRRAAAAAAAA {}", x.bytes().fold(0, |accum, _| accum + 1) as u64);
+        accum + x.bytes().fold(0, |accum, _| accum + 1) as u64
     });
     if byte_amount > u32::MAX as u64 {
         Err(Bad::TooLarge) 
@@ -36,13 +37,20 @@ pub fn ball(mut files : Vec<File>) -> Result<Vec<u8>, Bad> {
         let mut indices: Vec<usize> = Vec::new();
         for file in files.iter_mut() {
 
+            println!("blah blah head. {}", file.bytes().fold(0, |accum, _| accum + 1));
+
             indices.push(out.len());  //don't have to add anythign b/c intro 4 bytes and placeholder 0s are in already
 
             let mut byte_vec = Vec::new();
-            if file.read_to_end(&mut byte_vec).is_err() {
-                return Err(Bad::Error(ErrorKind::Interrupted));
+            let tmp = file.read_to_end(&mut byte_vec);
+            if tmp.is_err() {
+                return Err(Bad::IOError(tmp.err().unwrap()));
             }
+
+            println!("len {}", byte_vec.len());
+
             for byte in byte_vec.iter() {
+                println!("there is a byte");
                 out.push(*byte);
             }
 
@@ -112,37 +120,35 @@ pub fn unball_and_write(ball : Vec<u8>, file_name : &str, print : bool) -> Resul
     Ok(())
 }
 
-pub fn compress_and_write(readfile : &mut File, file_name : &str, print : bool) -> Result<(), std::io::Error> {
+pub fn compress_and_write(bytes : &mut Vec<u8>, file_name : &str, print : bool) -> Result<(), std::io::Error> {
     if print { println!("Reading file"); }
 
     let mut writefile = File::create(file_name.to_string() + ".crispyfries")?;
-    let mut file_buf : Vec<u8> = Vec::new();
-    readfile.read_to_end(&mut file_buf)?;
 
     if print { println!("Part 1"); }
 
     let mut affected_indexes : Vec<u32> = Vec::new();
     {
     let mut i = 0;
-        while i < file_buf.len() {
-            if file_buf.len() > 7 && i < file_buf.len() - 7 {
-                if file_buf[i + 1] == file_buf[i] &&
-                file_buf[i + 2] == file_buf[i] &&
-                file_buf[i + 3] == file_buf[i] && 
-                file_buf[i + 4] == file_buf[i] && 
-                file_buf[i + 5] == file_buf[i] && 
-                file_buf[i + 6] == file_buf[i] {
+        while i < bytes.len() {
+            if bytes.len() > 7 && i < bytes.len() - 7 {
+                if bytes[i + 1] == bytes[i] &&
+                bytes[i + 2] == bytes[i] &&
+                bytes[i + 3] == bytes[i] && 
+                bytes[i + 4] == bytes[i] && 
+                bytes[i + 5] == bytes[i] && 
+                bytes[i + 6] == bytes[i] {
                     let mut cntr : u8 = 1;
-                    while i + 1 < file_buf.len() && cntr < 255 && file_buf[i + 1] == file_buf[i] {
-                        file_buf.remove(i + 1);
+                    while i + 1 < bytes.len() && cntr < 255 && bytes[i + 1] == bytes[i] {
+                        bytes.remove(i + 1);
                         cntr += 1;
                     }
                     affected_indexes.push(i as u32);
-                    file_buf.insert(i, cntr);
+                    bytes.insert(i, cntr);
                 }
             }
             if print && i % 1000 == 0 {
-                println!("{}%", (((i as f64 / file_buf.len() as f64) * 100000.) as u64) as f64 / 1000.);
+                println!("{}%", (((i as f64 / bytes.len() as f64) * 100000.) as u64) as f64 / 1000.);
             } 
             i += 1;
         }
@@ -152,16 +158,16 @@ pub fn compress_and_write(readfile : &mut File, file_name : &str, print : bool) 
     for i in 0..affected_indexes.len() {
         let bruh = affected_indexes[i].to_le_bytes();
         for j in bruh {
-            file_buf.insert(0, j);
+            bytes.insert(0, j);
         }
     }
     let num = (affected_indexes.len() as u32).to_le_bytes();
     for thing in num {
-        file_buf.insert(0, thing);
+        bytes.insert(0, thing);
     }
     if print { println!("Writing file"); }
 
-    writefile.write_all(&file_buf)
+    writefile.write_all(&bytes)
 }
 
 pub fn decompress(file_name : &str) -> Result<Vec<u8>, Bad> {
@@ -184,9 +190,11 @@ pub fn decompress(file_name : &str) -> Result<Vec<u8>, Bad> {
         let mut file_buf : Vec<u8> = Vec::new();
         readfile.read_to_end(&mut file_buf).expect("Reading into buffer in decompression mode didn't work");
 
-        if (&readfile).bytes().count() > u32::MAX as usize {
+        let readfile_len = (&readfile).bytes().fold(0, |accum, _| accum + 1);
+
+        if readfile_len >= u32::MAX as usize {
             Err(Bad::TooLarge)
-        } else if readfile.bytes().count() == 0 {
+        } else if readfile_len == 0 {
             Err(Bad::Nothing)
         } else {
             let mut counter_buf : [u8; 4] = [0; 4];

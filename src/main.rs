@@ -29,7 +29,6 @@ fn main() {
         exit(1);
     }
 
-
     let mut file_vec : Vec<File> = file_names.iter().map(|name| {
         let tmp = File::open(name);
         if tmp.is_err() {
@@ -39,9 +38,11 @@ fn main() {
         tmp.ok().unwrap()
     }).collect();
 
+    println!("file_vec len {}. file name 0 {}.   waoidjdawioj {}", file_vec.len(), file_names[0], (&file_vec[0]).bytes().fold(0, |accum, _| accum + 1));
+
     if compression {
 
-        let bytes : Vec<u8> = match the_thing::ball(file_vec) {
+        let mut bytes : Vec<u8> = match the_thing::ball(file_vec) {
             Ok(x) => x,
             Err(Bad::Nothing) => {
                 println!("unreachable");
@@ -65,7 +66,32 @@ fn main() {
                 exit(1);
             }
         };
+
+        let mut write_tmp = File::create("tmp").unwrap();
+        write_tmp.write_all(&mut bytes).unwrap();
+
+        //the_thing::compress_and_write(&mut bytes, "out.crispied", true).unwrap();
     } else {
+
+        let bytes_vec : Vec<u8> = match the_thing::decompress(&file_names[0]) {
+            Ok(x) => x,
+            Err(Bad::Nothing) => {
+                println!("Empty file");
+                exit(1);
+            },
+            Err(Bad::TooLarge) => {
+                println!("File too large");
+                exit(1);
+            },
+            Err(Bad::IOError(e)) => {
+                println!("IO error {}", e);
+                exit(1);
+            },
+            Err(Bad::Error(e)) => {
+                println!("Error {}", e);
+                exit(1);
+            }
+        };
 
     }
 
