@@ -1,5 +1,5 @@
 use core::num;
-use std::io::{Error, ErrorKind, Read, Write};
+use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::fs::{File, OpenOptions};
 use std::usize;
 
@@ -12,10 +12,21 @@ pub enum Bad {
 
 pub fn ball(mut files : Vec<File>) -> Result<Vec<u8>, Bad> {
     let files_num = files.len();
+
+    println!("there are {} files", files_num);
+
     let byte_amount = files.iter().fold(0, |accum : u64, x| {
-        println!("WERRRAAAAAAAA {}", x.bytes().fold(0, |accum, _| accum + 1) as u64);
+        //println!("WERRRAAAAAAAA {}", x.bytes().fold(0, |accum, _| accum + 1) as u64);
         accum + x.bytes().fold(0, |accum, _| accum + 1) as u64
     });
+
+    for file in files.iter_mut() {
+        match file.seek(SeekFrom::Start(0)) {
+            Ok(_) => {},
+            Err(e) => return Err(Bad::IOError(e)),
+        }
+    }
+
     if byte_amount > u32::MAX as u64 {
         Err(Bad::TooLarge) 
     } else if byte_amount == 0 {
@@ -23,7 +34,7 @@ pub fn ball(mut files : Vec<File>) -> Result<Vec<u8>, Bad> {
     } else {
         let mut out : Vec<u8> = Vec::new();
 
-        let intro = files_num.to_le_bytes();
+        let intro = (files_num as u32).to_le_bytes();
         for byte in intro.iter() {
             out.push(*byte);
         }
@@ -37,7 +48,7 @@ pub fn ball(mut files : Vec<File>) -> Result<Vec<u8>, Bad> {
         let mut indices: Vec<usize> = Vec::new();
         for file in files.iter_mut() {
 
-            println!("blah blah head. {}", file.bytes().fold(0, |accum, _| accum + 1));
+            //println!("blah blah head. {}", file.bytes().fold(0, |accum, _| accum + 1));
 
             indices.push(out.len());  //don't have to add anythign b/c intro 4 bytes and placeholder 0s are in already
 
@@ -50,7 +61,6 @@ pub fn ball(mut files : Vec<File>) -> Result<Vec<u8>, Bad> {
             println!("len {}", byte_vec.len());
 
             for byte in byte_vec.iter() {
-                println!("there is a byte");
                 out.push(*byte);
             }
 
@@ -58,7 +68,7 @@ pub fn ball(mut files : Vec<File>) -> Result<Vec<u8>, Bad> {
 
         //addresses replacing the placeholder bytes
         for (i, ind) in indices.iter().enumerate() {
-            let ind_in_bytes = ind.to_le_bytes();
+            let ind_in_bytes = (*ind as u32).to_le_bytes();
             for (j, byte) in ind_in_bytes.iter().enumerate() {
                 out[4 + (i * 4) + j] = *byte;
             }
@@ -74,29 +84,67 @@ pub fn unball_and_write(ball : Vec<u8>, file_name : &str, print : bool) -> Resul
     for (i, x) in tmp_vec.iter().enumerate() {
         tmp_arr[i] = *x;
     }
+
+    if print {
+        println!("num of files in this ball is {}", u32::from_le_bytes(tmp_arr));
+    }
+
     let num_files = u32::from_le_bytes(tmp_arr);
 
     let mut indices : Vec<u32> = Vec::new();
     for i in 0..num_files {
         let mut tmp_arr : [u8; 4] = [0; 4];
-        let tmp_vec = ball.iter().enumerate().filter(|(index, x)| {
-            *index > 4 + (i as usize * 4) && *index < 8 + (i as usize * 4)
+
+        if print {
+            println!("from {} to {}", 4 + (i as usize * 4), 8 + (i as usize * 4));
+        }
+
+        let tmp_vec = ball.iter().enumerate().filter(|(index, _)| {
+            *index >= 4 + (i as usize * 4) && *index < 8 + (i as usize * 4)
         }).map(|(_, x)| *x).collect::<Vec<u8>>();
         for (ind, x) in tmp_vec.iter().enumerate() {
             tmp_arr[ind] = *x;
+
+            if print {
+                println!("value of x is {}", *x);
+            }
         }
 
         indices.push(u32::from_le_bytes(tmp_arr));
     }
 
+    if print {
+        for (i, ind) in indices.iter().enumerate() {
+            println!("index {} is location {}", i, ind);
+        }
+    }
+
     for i in 0..(num_files as usize) {
         let mut byte_vec : Vec<u8> = Vec::new();
+
+        if print {
+            if i == indices.len() - 1 {
+                println!("at end. from {} to {}", indices[i] as usize - 1, ball.len());
+            } else {
+                println!("from {} to {}", indices[i] as usize - 1, indices[i + 1] as usize);
+            }
+        }
+
         byte_vec = ball.iter().enumerate().filter(|(index, _)| {
-            *index > indices[i] as usize && (*index < ball.len() || *index < indices[i + 1] as usize)
+            if i == indices.len() - 1 {
+                //at end
+                *index >= indices[i] as usize&& *index < ball.len()
+            } else {
+                *index >= indices[i] as usize && *index < indices[i + 1] as usize
+            }
         }).map(|(_, x)| *x).collect();
 
-        let mut writefile = File::create(format!("uncrispied file {}", i))?;
-        writefile.write_all(&mut byte_vec);
+        if print {
+            println!("byte_vec len {}", &byte_vec.len());
+        }
+
+        let mut writefile = File::create(format!("{} uncrispied file {}", file_name, i))?;
+        writefile.write_all(&mut byte_vec)?;
     }
 
     // let mut i : u32 = 0;
@@ -127,7 +175,7 @@ pub fn compress_and_write(bytes : &mut Vec<u8>, file_name : &str, print : bool) 
 
     if print { println!("Part 1"); }
 
-    let mut affected_indexes : Vec<u32> = Vec::new();
+    let mut affected_indices : Vec<u32> = Vec::new();
     {
     let mut i = 0;
         while i < bytes.len() {
@@ -143,7 +191,7 @@ pub fn compress_and_write(bytes : &mut Vec<u8>, file_name : &str, print : bool) 
                         bytes.remove(i + 1);
                         cntr += 1;
                     }
-                    affected_indexes.push(i as u32);
+                    affected_indices.push(i as u32);
                     bytes.insert(i, cntr);
                 }
             }
@@ -155,15 +203,15 @@ pub fn compress_and_write(bytes : &mut Vec<u8>, file_name : &str, print : bool) 
     }
     if print { println!("Part 2"); }
     
-    for i in 0..affected_indexes.len() {
-        let bruh = affected_indexes[i].to_le_bytes();
-        for j in bruh {
-            bytes.insert(0, j);
+    for i in 0..affected_indices.len() {
+        let bruh = affected_indices[i].to_le_bytes();
+        for (ind, byte) in bruh.iter().enumerate() {
+            bytes.insert(ind, *byte);
         }
     }
-    let num = (affected_indexes.len() as u32).to_le_bytes();
-    for thing in num {
-        bytes.insert(0, thing);
+    let num = (affected_indices.len() as u32).to_le_bytes();
+    for (ind, byte) in num.iter().enumerate() {
+        bytes.insert(ind, *byte);
     }
     if print { println!("Writing file"); }
 
@@ -188,7 +236,15 @@ pub fn decompress(file_name : &str) -> Result<Vec<u8>, Bad> {
         let mut readfile = readfile_res.ok().unwrap();
 
         let mut file_buf : Vec<u8> = Vec::new();
-        readfile.read_to_end(&mut file_buf).expect("Reading into buffer in decompression mode didn't work");
+        match readfile.read_to_end(&mut file_buf) {
+            Ok(_) => {},
+            Err(e) => return Err(Bad::IOError(e)),
+        }
+
+        match readfile.seek(SeekFrom::Start(0)) {
+            Ok(_) => {},
+            Err(e) => return Err(Bad::IOError(e)),
+        }
 
         let readfile_len = (&readfile).bytes().fold(0, |accum, _| accum + 1);
 
@@ -201,7 +257,7 @@ pub fn decompress(file_name : &str) -> Result<Vec<u8>, Bad> {
             for i in 0..4 {
                 counter_buf[i] = file_buf[i];
             }
-            let counter : u32 = u32::from_be_bytes(counter_buf);
+            let counter : u32 = u32::from_le_bytes(counter_buf);
             let mut offset : usize = 4;
             let mut positions_buf : Vec<u8> = Vec::new();
             for _i in 0..counter {
@@ -218,7 +274,7 @@ pub fn decompress(file_name : &str) -> Result<Vec<u8>, Bad> {
                     items[j] = positions_buf[offset + j];
                 }
                 offset += 4;
-                positions.push(u32::from_be_bytes(items));
+                positions.push(u32::from_le_bytes(items));
             }
             let ptr : usize= 4 + (4 * (counter as usize));
             let mut out : Vec<u8> = file_buf[ptr..file_buf.len()].to_vec();

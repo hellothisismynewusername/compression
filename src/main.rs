@@ -1,4 +1,4 @@
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::process::exit;
 use std::fs::File;
 
@@ -40,6 +40,8 @@ fn main() {
 
     println!("file_vec len {}. file name 0 {}.   waoidjdawioj {}", file_vec.len(), file_names[0], (&file_vec[0]).bytes().fold(0, |accum, _| accum + 1));
 
+    file_vec[0].seek(SeekFrom::Start(0)).expect("Seek error");
+
     if compression {
 
         let mut bytes : Vec<u8> = match the_thing::ball(file_vec) {
@@ -67,10 +69,11 @@ fn main() {
             }
         };
 
-        let mut write_tmp = File::create("tmp").unwrap();
-        write_tmp.write_all(&mut bytes).unwrap();
+        // let mut write_tmp = File::create("tmp").unwrap();
+        // write_tmp.write_all(&mut bytes).unwrap();
 
-        //the_thing::compress_and_write(&mut bytes, "out.crispied", true).unwrap();
+        the_thing::compress_and_write(&mut bytes, "out", true).unwrap();
+    
     } else {
 
         let bytes_vec : Vec<u8> = match the_thing::decompress(&file_names[0]) {
@@ -93,11 +96,15 @@ fn main() {
             }
         };
 
+        print_u8_vec(&bytes_vec);
+
+        the_thing::unball_and_write(bytes_vec, "idklmao", true).unwrap();
+
     }
 
 }
 
-/*
+
 fn print_u8_vec(inp : &Vec<u8>) {
     println!();
     print!("{{");
@@ -106,4 +113,4 @@ fn print_u8_vec(inp : &Vec<u8>) {
     }
     print!("}}");
 }
-*/
+
