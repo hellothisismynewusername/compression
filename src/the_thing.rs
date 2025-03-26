@@ -10,10 +10,12 @@ pub enum Bad {
     Error(ErrorKind)
 }
 
-pub fn ball(mut files : Vec<File>) -> Result<Vec<u8>, Bad> {
+pub fn ball(mut files : Vec<File>, names : Vec<String>, print : bool) -> Result<Vec<u8>, Bad> {
     let files_num = files.len();
 
-    println!("there are {} files", files_num);
+    if print {
+        println!("there are {} files", files_num);
+    }
 
     let byte_amount = files.iter().fold(0, |accum : u64, x| {
         //println!("WERRRAAAAAAAA {}", x.bytes().fold(0, |accum, _| accum + 1) as u64);
@@ -58,7 +60,9 @@ pub fn ball(mut files : Vec<File>) -> Result<Vec<u8>, Bad> {
                 return Err(Bad::IOError(tmp.err().unwrap()));
             }
 
-            println!("len {}", byte_vec.len());
+            if print {
+                println!("len {}", byte_vec.len());
+            }
 
             for byte in byte_vec.iter() {
                 out.push(*byte);

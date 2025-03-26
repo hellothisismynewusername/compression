@@ -44,7 +44,7 @@ fn main() {
 
     if compression {
 
-        let mut bytes : Vec<u8> = match the_thing::ball(file_vec) {
+        let mut bytes : Vec<u8> = match the_thing::ball(file_vec, file_names, print) {
             Ok(x) => x,
             Err(Bad::Nothing) => {
                 println!("unreachable");
@@ -72,7 +72,7 @@ fn main() {
         // let mut write_tmp = File::create("tmp").unwrap();
         // write_tmp.write_all(&mut bytes).unwrap();
 
-        the_thing::compress_and_write(&mut bytes, "out", true).unwrap();
+        the_thing::compress_and_write(&mut bytes, "out", print).unwrap();
     
     } else {
 
@@ -96,15 +96,15 @@ fn main() {
             }
         };
 
-        print_u8_vec(&bytes_vec);
+        //print_u8_vec(&bytes_vec);
 
-        the_thing::unball_and_write(bytes_vec, "idklmao", true).unwrap();
+        the_thing::unball_and_write(bytes_vec, "idklmao", print).unwrap();
 
     }
 
 }
 
-
+/*
 fn print_u8_vec(inp : &Vec<u8>) {
     println!();
     print!("{{");
@@ -113,4 +113,4 @@ fn print_u8_vec(inp : &Vec<u8>) {
     }
     print!("}}");
 }
-
+*/
