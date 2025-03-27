@@ -1,13 +1,13 @@
-use core::num;
-use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
-use std::fs::{File, OpenOptions};
+use std::io::{Error, Read, Seek, SeekFrom, Write};
+use std::fs::File;
+use std::string::FromUtf8Error;
 use std::usize;
 
 pub enum Bad {
     Nothing,
     TooLarge,
     IOError(Error),
-    Error(ErrorKind)
+    FromUtf8Error(FromUtf8Error)
 }
 
 pub fn ball(mut files : Vec<File>, names : Vec<String>, print : bool) -> Result<Vec<u8>, Bad> {
@@ -42,8 +42,23 @@ pub fn ball(mut files : Vec<File>, names : Vec<String>, print : bool) -> Result<
         }
 
         //shove in the spots for the indices before concatting files bytes
-        for i in 0..(files_num * 4) {
+        for _ in 0..(files_num * 4) {
             out.push(0u8);
+        }
+
+        //put in filenames
+        for name in names.iter() {
+            let name_buf = name.as_bytes().to_vec();
+            let name_len : u16 = name_buf.len() as u16;
+            let name_len_buf = name_len.to_le_bytes();
+
+            for b in name_len_buf.iter() {
+                out.push(*b);
+            }
+
+            for b in name_buf.iter() {
+                out.push(*b);
+            }
         }
 
         //concatting files bytes and determining their addresses
@@ -82,7 +97,7 @@ pub fn ball(mut files : Vec<File>, names : Vec<String>, print : bool) -> Result<
     }
 }
 
-pub fn unball_and_write(ball : Vec<u8>, file_name : &str, print : bool) -> Result<(), std::io::Error> {
+pub fn unball_and_write(ball : Vec<u8>, print : bool, gentle_print : bool) -> Result<(), Bad> {
     let mut tmp_arr : [u8; 4] = [0; 4];
     let tmp_vec = ball.iter().enumerate().filter(|(i, _)| *i < 4).map(|(_, x)| *x).collect::<Vec<u8>>();
     for (i, x) in tmp_vec.iter().enumerate() {
@@ -123,8 +138,49 @@ pub fn unball_and_write(ball : Vec<u8>, file_name : &str, print : bool) -> Resul
         }
     }
 
+    let mut names : Vec<String> = Vec::new();
+    let mut ind = 4 + (num_files as usize * 4);
+    for _ in 0..num_files {
+
+        let curr_name_len_buf : Vec<u8> = ball.iter().enumerate().filter(|(index, _)| {
+            *index >= ind && *index < ind + 2
+        }).map(|(_, byte)| *byte).collect();
+        let mut curr_name_len_buf_arr : [u8; 2] = [0; 2];
+        for (a, byte) in curr_name_len_buf.iter().enumerate() {
+            curr_name_len_buf_arr[a] = *byte;
+        }
+
+        let curr_name_len = u16::from_le_bytes(curr_name_len_buf_arr);
+
+        if print {
+            println!("curr_name_len {}", curr_name_len);
+        }
+
+        let curr_name_buf : Vec<u8> = ball.iter().enumerate().filter(|(index, _)| {
+            *index >= ind + 2 && *index < ind + 2 + curr_name_len as usize
+        }).map(|(_, byte)| *byte).collect();
+
+        let curr_name_tmp = String::from_utf8(curr_name_buf);
+        if curr_name_tmp.is_err() {
+            return Err(Bad::FromUtf8Error(curr_name_tmp.err().unwrap()));
+        }
+        let curr_name = curr_name_tmp.unwrap();
+        
+        if print {
+            println!("curr_name {}", curr_name);
+        }
+
+        names.push(curr_name);
+
+        ind += 2 + curr_name_len as usize;
+    }
+
+    if gentle_print || print {
+        println!("Writing files");
+    }
+
     for i in 0..(num_files as usize) {
-        let mut byte_vec : Vec<u8> = Vec::new();
+        let mut byte_vec : Vec<u8>;
 
         if print {
             if i == indices.len() - 1 {
@@ -137,7 +193,7 @@ pub fn unball_and_write(ball : Vec<u8>, file_name : &str, print : bool) -> Resul
         byte_vec = ball.iter().enumerate().filter(|(index, _)| {
             if i == indices.len() - 1 {
                 //at end
-                *index >= indices[i] as usize&& *index < ball.len()
+                *index >= indices[i] as usize && *index < ball.len()
             } else {
                 *index >= indices[i] as usize && *index < indices[i + 1] as usize
             }
@@ -147,32 +203,20 @@ pub fn unball_and_write(ball : Vec<u8>, file_name : &str, print : bool) -> Resul
             println!("byte_vec len {}", &byte_vec.len());
         }
 
-        let mut writefile = File::create(format!("{} uncrispied file {}", file_name, i))?;
-        writefile.write_all(&mut byte_vec)?;
+        let writefile = File::create(format!("{}", names[i]));
+        if writefile.is_err() {
+            return Err(Bad::IOError(writefile.err().unwrap()));
+        }
+        match writefile.unwrap().write_all(&mut byte_vec) {
+            Ok(_) => {},
+            Err(e) => return Err(Bad::IOError(e))
+        }
     }
-
-    // let mut i : u32 = 0;
-    // let mut curr_file_num = 0;
-    // while i < ball.len() as u32 {
-
-    //     if indices[curr_file_num] == i {
-
-    //         if curr_file_num > 0 { //start of a file has been reached but it's not the start of the first file
-                
-    //         }
-
-    //         curr_file_num += 1;
-    //     }
-
-    //     i += 1;
-    // }
-    
-
 
     Ok(())
 }
 
-pub fn compress_and_write(bytes : &mut Vec<u8>, file_name : &str, print : bool) -> Result<(), std::io::Error> {
+pub fn compress_and_write(bytes : &mut Vec<u8>, file_name : &str, print : bool, gentle_print : bool) -> Result<(), std::io::Error> {
     if print { println!("Reading file"); }
 
     let mut writefile = File::create(file_name.to_string() + ".crispyfries")?;
@@ -217,20 +261,12 @@ pub fn compress_and_write(bytes : &mut Vec<u8>, file_name : &str, print : bool) 
     for (ind, byte) in num.iter().enumerate() {
         bytes.insert(ind, *byte);
     }
-    if print { println!("Writing file"); }
+    if print || gentle_print { println!("Writing"); }
 
     writefile.write_all(&bytes)
 }
 
 pub fn decompress(file_name : &str) -> Result<Vec<u8>, Bad> {
-    // let mut new_file_name = String::new();
-    // if (file_name.len() as i32) - 12 < 0 {
-    //     new_file_name = String::from("out");
-    // } else {
-    //     for i in 0..(file_name.clone().unwrap().len() - 12) {
-    //         new_file_name.push(file_name.clone().unwrap().chars().nth(i).unwrap());
-    //     }
-    // }
 
     let readfile_res = File::open(file_name);
     if readfile_res.is_err() {
